@@ -468,7 +468,6 @@ deck = pdk.Deck(
         grid_gdf
     ),
     map_provider=None,
-    map_style=None,
     tooltip={
         "html": (
             "<b>Per capita GDP ({year})</b>: "
