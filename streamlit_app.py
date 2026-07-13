@@ -52,8 +52,7 @@ YEAR_COLUMNS = {
 # ---------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="China grid-cell GDP per capita",
-    page_icon="🗺️",
+    page_title="Per capita GDP",
     layout="wide",
 )
 
@@ -393,11 +392,6 @@ with st.sidebar:
         max_value=100,
         value=95,
         step=1,
-        help=(
-            "Values above this percentile receive "
-            "the brightest color. Tooltip values "
-            "are unchanged."
-        ),
     )
 
     opacity = st.slider(
@@ -473,6 +467,7 @@ deck = pdk.Deck(
     initial_view_state=initial_view(
         grid_gdf
     ),
+    map_provider=None,
     map_style=None,
     tooltip={
         "html": (
