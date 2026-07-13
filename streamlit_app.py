@@ -22,7 +22,7 @@ import streamlit as st
 DATA_URL = (
     "https://raw.githubusercontent.com/"
     "cesarechevarria/scratch/"
-    "c101347d4e651f0a37c81cd0251860d1bc237717/china_grid_cell_cleaned/"
+    "c101347d4e651f0a37c81cd0251860d1bc237717/"
     "china_grid_cell_cleaned.gpkg"
 )
 
