@@ -350,7 +350,7 @@ st.title(
 )
 
 st.caption(
-    "China, grid cells (Mendez, n.d.; Rossi-Hansberg & Zhang, 2026)"
+    "China grid cells (Mendez, n.d.; Rossi-Hansberg & Zhang, 2026), 2012-2022"
 )
 
 configured_url = os.environ.get(
@@ -465,7 +465,7 @@ deck = pdk.Deck(
             "{gdppc_label}<br/>"
             "<b>ADM1</b>: {name_1}<br/>"
             "<b>ADM2</b>: {name_2}<br/>"
-            "<b>Cell ID</b>: {cell_id}"
+            "<b>Grid cell ID</b>: {cell_id}"
         ),
         "style": {
             "backgroundColor": (
