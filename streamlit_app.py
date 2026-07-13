@@ -394,15 +394,6 @@ with st.sidebar:
         step=1,
     )
 
-    opacity = st.slider(
-        "Grid opacity",
-        min_value=100,
-        max_value=200,
-        value=180,
-        step=5,
-    )
-
-
 # ---------------------------------------------------------------------
 # Prepare selected year
 # ---------------------------------------------------------------------
@@ -416,7 +407,7 @@ values = grid_gdf[
 fill_colors = colorize(
     values=values,
     upper_percentile=upper_percentile,
-    opacity=opacity,
+    opacity=200,
 )
 
 map_gdf = grid_gdf[
