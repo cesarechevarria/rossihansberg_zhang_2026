@@ -22,8 +22,8 @@ import streamlit as st
 DATA_URL = (
     "https://raw.githubusercontent.com/"
     "cesarechevarria/scratch/"
-    "ea6d50d07843346ec5ea51083eedab743dc9de88/"
-    "china_grid_cellls_cleaned.gpkg"
+    "c101347d4e651f0a37c81cd0251860d1bc237717/china_grid_cell_cleaned/"
+    "china_grid_cell_cleaned.gpkg"
 )
 
 DATA_DIRECTORY = Path(
@@ -33,7 +33,7 @@ DATA_DIRECTORY = Path(
     )
 )
 
-DEFAULT_DATA_PATH = DATA_DIRECTORY / "china_grid_cellls_cleaned.gpkg"
+DEFAULT_DATA_PATH = DATA_DIRECTORY / "china_grid_cells_cleaned.gpkg"
 
 LAYER_NAME = "china_grid_cells"
 ADM1_NAME = "name_1"
