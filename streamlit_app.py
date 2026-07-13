@@ -19,7 +19,6 @@ import streamlit as st
 # Data configuration
 # ---------------------------------------------------------------------
 
-# Raw GitHub URL for the GeoPackage.
 DATA_URL = (
     "https://raw.githubusercontent.com/"
     "cesarechevarria/scratch/"
@@ -37,10 +36,10 @@ DATA_DIRECTORY = Path(
 DEFAULT_DATA_PATH = DATA_DIRECTORY / "china_grid_cellls_cleaned.gpkg"
 
 LAYER_NAME = "china_grid_cells"
-
 ADM1_NAME = "name_1"
 ADM2_NAME = "name_2"
 CELL_ID = "cell_id"
+PALETTE = "magma"
 
 YEAR_COLUMNS = {
     year: f"gdppc_{year}"
@@ -68,8 +67,15 @@ def get_geopackage(
     url: str = DATA_URL,
     destination: Path = DEFAULT_DATA_PATH,
 ) -> Path:
-    """Download the GeoPackage once and return its local path."""
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    """
+    Download the GeoPackage once and return its local path.
+
+    Streamlit reuses the downloaded file during subsequent reruns.
+    """
+    destination.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     if destination.exists() and destination.stat().st_size > 0:
         with destination.open("rb") as existing_file:
@@ -80,11 +86,15 @@ def get_geopackage(
 
         destination.unlink(missing_ok=True)
 
-    partial_path = destination.with_suffix(destination.suffix + ".part")
+    partial_path = destination.with_suffix(
+        destination.suffix + ".part"
+    )
 
     request = Request(
         url,
-        headers={"User-Agent": "china-gdppc-streamlit-app"},
+        headers={
+            "User-Agent": "china-gdppc-streamlit-app",
+        },
     )
 
     try:
@@ -97,10 +107,18 @@ def get_geopackage(
                 )
 
             with partial_path.open("wb") as output_file:
-                shutil.copyfileobj(response, output_file)
+                shutil.copyfileobj(
+                    response,
+                    output_file,
+                )
 
-        if not partial_path.exists() or partial_path.stat().st_size == 0:
-            raise RuntimeError("The downloaded GeoPackage is empty.")
+        if (
+            not partial_path.exists()
+            or partial_path.stat().st_size == 0
+        ):
+            raise RuntimeError(
+                "The downloaded GeoPackage is empty."
+            )
 
         with partial_path.open("rb") as downloaded_file:
             header = downloaded_file.read(16)
@@ -112,6 +130,7 @@ def get_geopackage(
             )
 
         partial_path.replace(destination)
+
         return destination
 
     except Exception:
@@ -124,12 +143,18 @@ def get_geopackage(
 # ---------------------------------------------------------------------
 
 @st.cache_data(show_spinner="Loading GeoPackage...")
-def load_data(path_string: str) -> gpd.GeoDataFrame:
-    """Load and validate the grid-cell layer."""
+def load_data(
+    path_string: str,
+) -> gpd.GeoDataFrame:
+    """
+    Load and validate the grid-cell layer.
+    """
     path = Path(path_string)
 
     if not path.exists():
-        raise FileNotFoundError(f"GeoPackage not found: {path}")
+        raise FileNotFoundError(
+            f"GeoPackage not found: {path}"
+        )
 
     grid = gpd.read_file(
         path,
@@ -144,21 +169,27 @@ def load_data(path_string: str) -> gpd.GeoDataFrame:
         *YEAR_COLUMNS.values(),
     }
 
-    missing_columns = sorted(required_columns.difference(grid.columns))
+    missing_columns = sorted(
+        required_columns.difference(grid.columns)
+    )
 
     if missing_columns:
         raise ValueError(
-            "Missing required columns: " + ", ".join(missing_columns)
+            "Missing required columns: "
+            + ", ".join(missing_columns)
         )
 
     if grid.crs is None:
-        raise ValueError("The GeoPackage layer does not have a CRS.")
+        raise ValueError(
+            "The GeoPackage layer does not have a CRS."
+        )
 
     if grid.crs.to_epsg() != 4326:
         grid = grid.to_crs(epsg=4326)
 
     grid = grid.loc[
-        grid.geometry.notna() & ~grid.geometry.is_empty
+        grid.geometry.notna()
+        & ~grid.geometry.is_empty
     ].copy()
 
     if not grid.geometry.is_valid.all():
@@ -173,113 +204,137 @@ def load_data(path_string: str) -> gpd.GeoDataFrame:
 
 def colorize(
     values: pd.Series,
-    palette: str,
-    upper_percentile: float,
+    upper_percentile: int,
     opacity: int,
-) -> tuple[list[list[int]], float, float]:
-    """Convert GDP-per-capita values to RGBA colors."""
-    numeric = pd.to_numeric(values, errors="coerce").astype(float)
-    valid = numeric[np.isfinite(numeric)]
+) -> list[list[int]]:
+    """
+    Convert GDP-per-capita values to Magma RGBA colors.
+    """
+    numeric = pd.to_numeric(
+        values,
+        errors="coerce",
+    ).astype(float)
+
+    valid = numeric[
+        np.isfinite(numeric)
+    ]
 
     if valid.empty:
-        missing_colors = [
+        return [
             [160, 160, 160, 80]
             for _ in numeric
         ]
-        return missing_colors, 0.0, 1.0
 
     lower = float(valid.min())
-    upper = float(np.nanpercentile(valid, upper_percentile))
 
-    if not np.isfinite(upper - lower) or upper <= lower:
-        normalized = np.zeros(len(numeric), dtype=float)
+    upper = float(
+        np.nanpercentile(
+            valid,
+            upper_percentile,
+        )
+    )
+
+    if (
+        not np.isfinite(upper - lower)
+        or upper <= lower
+    ):
+        normalized = np.zeros(
+            len(numeric),
+            dtype=float,
+        )
     else:
         normalized = np.clip(
-            (numeric.to_numpy() - lower) / (upper - lower),
+            (
+                numeric.to_numpy()
+                - lower
+            )
+            / (
+                upper
+                - lower
+            ),
             0.0,
             1.0,
         )
 
-    color_map = mpl.colormaps[palette]
-    rgba = np.round(color_map(normalized) * 255).astype(int)
+    color_map = mpl.colormaps[PALETTE]
+
+    rgba = np.round(
+        color_map(normalized) * 255
+    ).astype(int)
+
     rgba[:, 3] = opacity
 
-    missing = ~np.isfinite(numeric.to_numpy())
-    rgba[missing] = [160, 160, 160, 80]
+    missing = ~np.isfinite(
+        numeric.to_numpy()
+    )
 
-    return rgba.tolist(), lower, upper
+    rgba[missing] = [
+        160,
+        160,
+        160,
+        80,
+    ]
+
+    return rgba.tolist()
 
 
-def format_value(value: float) -> str:
-    """Format GDP-per-capita values without adding units."""
+def format_value(
+    value: float,
+) -> str:
+    """
+    Format GDP-per-capita values without a unit label.
+    """
     if pd.isna(value):
         return "No data"
 
     return f"{value:,.0f}"
 
 
-def make_legend(
-    palette: str,
-    minimum: float,
-    maximum: float,
-) -> str:
-    """Generate an HTML color-gradient legend."""
-    color_map = mpl.colormaps[palette]
-    stops = []
-
-    for index in range(9):
-        fraction = index / 8
-        red, green, blue, _ = (
-            np.array(color_map(fraction)) * 255
-        ).astype(int)
-
-        stops.append(
-            f"rgb({red},{green},{blue}) {fraction * 100:.0f}%"
-        )
-
-    gradient = ", ".join(stops)
-
-    return f"""
-    <div style="max-width: 520px; margin: 0.15rem 0 0.8rem 0;">
-        <div style="
-            height: 13px;
-            border-radius: 3px;
-            background: linear-gradient(90deg, {gradient});
-        ">
-        </div>
-
-        <div style="
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.82rem;
-            margin-top: 3px;
-        ">
-            <span>{minimum:,.0f}</span>
-            <span>{maximum:,.0f}</span>
-        </div>
-    </div>
+def initial_view(
+    grid: gpd.GeoDataFrame,
+) -> pdk.ViewState:
     """
-
-
-def initial_view(grid: gpd.GeoDataFrame) -> pdk.ViewState:
-    """Calculate the initial center and zoom from the data bounds."""
+    Calculate the initial center and zoom from the data bounds.
+    """
     xmin, ymin, xmax, ymax = grid.total_bounds
 
-    longitude = (xmin + xmax) / 2
-    latitude = (ymin + ymax) / 2
+    longitude = (
+        xmin + xmax
+    ) / 2
 
-    longitude_span = max(xmax - xmin, 1e-6)
-    latitude_span = max(ymax - ymin, 1e-6)
+    latitude = (
+        ymin + ymax
+    ) / 2
+
+    longitude_span = max(
+        xmax - xmin,
+        1e-6,
+    )
+
+    latitude_span = max(
+        ymax - ymin,
+        1e-6,
+    )
 
     zoom = min(
-        math.log2(360 / longitude_span),
-        math.log2(170 / latitude_span),
+        math.log2(
+            360 / longitude_span
+        ),
+        math.log2(
+            170 / latitude_span
+        ),
     ) + 0.6
 
     return pdk.ViewState(
         longitude=longitude,
         latitude=latitude,
-        zoom=float(np.clip(zoom, 2.5, 5.0)),
+        zoom=float(
+            np.clip(
+                zoom,
+                2.5,
+                5.0,
+            )
+        ),
         min_zoom=2,
         max_zoom=12,
         pitch=0,
@@ -291,10 +346,12 @@ def initial_view(grid: gpd.GeoDataFrame) -> pdk.ViewState:
 # Load application data
 # ---------------------------------------------------------------------
 
-st.title("China grid-cell GDP per capita")
+st.title(
+    "Per capita GDP"
+)
 
 st.caption(
-    "Interactive grid-cell map for 2012–2022."
+    "China, grid cells (Mendez, n.d.; Rossi-Hansberg & Zhang, 2026)"
 )
 
 configured_url = os.environ.get(
@@ -303,11 +360,18 @@ configured_url = os.environ.get(
 )
 
 try:
-    geopackage_path = get_geopackage(url=configured_url)
-    grid_gdf = load_data(str(geopackage_path))
+    geopackage_path = get_geopackage(
+        url=configured_url,
+    )
+
+    grid_gdf = load_data(
+        str(geopackage_path)
+    )
 
 except Exception as exc:
-    st.error(f"Unable to load the GeoPackage: {exc}")
+    st.error(
+        f"Unable to load the GeoPackage: {exc}"
+    )
     st.stop()
 
 
@@ -316,48 +380,32 @@ except Exception as exc:
 # ---------------------------------------------------------------------
 
 with st.sidebar:
-    st.header("Map controls")
 
-    year = st.select_slider(
+    year = st.selectbox(
         "Year",
         options=list(YEAR_COLUMNS),
-        value=max(YEAR_COLUMNS),
-    )
-
-    palette = st.selectbox(
-        "Color palette",
-        options=[
-            "viridis",
-            "plasma",
-            "cividis",
-            "magma",
-        ],
-        index=0,
+        index=len(YEAR_COLUMNS) - 1,
     )
 
     upper_percentile = st.slider(
-        "Upper color limit (percentile)",
-        min_value=90.0,
-        max_value=100.0,
-        value=99.0,
-        step=0.5,
+        "Percentile stretch",
+        min_value=90,
+        max_value=100,
+        value=95,
+        step=1,
         help=(
-            "Values above this percentile receive the darkest color. "
-            "Tooltip values are unchanged."
+            "Values above this percentile receive "
+            "the brightest color. Tooltip values "
+            "are unchanged."
         ),
     )
 
     opacity = st.slider(
         "Grid opacity",
-        min_value=80,
-        max_value=255,
-        value=205,
+        min_value=100,
+        max_value=200,
+        value=180,
         step=5,
-    )
-
-    show_grid_lines = st.checkbox(
-        "Show grid borders",
-        value=True,
     )
 
 
@@ -366,11 +414,13 @@ with st.sidebar:
 # ---------------------------------------------------------------------
 
 value_column = YEAR_COLUMNS[year]
-values = grid_gdf[value_column]
 
-fill_colors, legend_min, legend_max = colorize(
+values = grid_gdf[
+    value_column
+]
+
+fill_colors = colorize(
     values=values,
-    palette=palette,
     upper_percentile=upper_percentile,
     opacity=opacity,
 )
@@ -386,22 +436,14 @@ map_gdf = grid_gdf[
 ].copy()
 
 map_gdf["fill_color"] = fill_colors
-map_gdf["gdppc_label"] = map_gdf[value_column].map(format_value)
-map_gdf["year"] = str(year)
 
-
-# ---------------------------------------------------------------------
-# Legend
-# ---------------------------------------------------------------------
-
-st.markdown(
-    make_legend(
-        palette=palette,
-        minimum=legend_min,
-        maximum=legend_max,
-    ),
-    unsafe_allow_html=True,
+map_gdf["gdppc_label"] = map_gdf[
+    value_column
+].map(
+    format_value
 )
+
+map_gdf["year"] = str(year)
 
 
 # ---------------------------------------------------------------------
@@ -415,12 +457,8 @@ grid_layer = pdk.Layer(
     pickable=True,
     auto_highlight=True,
     filled=True,
-    stroked=show_grid_lines,
+    stroked=False,
     get_fill_color="fill_color",
-    get_line_color=[255, 255, 255, 80],
-    get_line_width=0.35,
-    line_width_units="pixels",
-    line_width_min_pixels=0.2 if show_grid_lines else 0,
 )
 
 
@@ -429,18 +467,25 @@ grid_layer = pdk.Layer(
 # ---------------------------------------------------------------------
 
 deck = pdk.Deck(
-    layers=[grid_layer],
-    initial_view_state=initial_view(grid_gdf),
+    layers=[
+        grid_layer,
+    ],
+    initial_view_state=initial_view(
+        grid_gdf
+    ),
     map_style=None,
     tooltip={
         "html": (
-            "<b>GDP per capita ({year})</b>: {gdppc_label}<br/>"
+            "<b>Per capita GDP ({year})</b>: "
+            "{gdppc_label}<br/>"
             "<b>ADM1</b>: {name_1}<br/>"
             "<b>ADM2</b>: {name_2}<br/>"
             "<b>Cell ID</b>: {cell_id}"
         ),
         "style": {
-            "backgroundColor": "rgba(24, 24, 24, 0.92)",
+            "backgroundColor": (
+                "rgba(24, 24, 24, 0.92)"
+            ),
             "color": "white",
             "fontSize": "13px",
         },
