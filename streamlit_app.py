@@ -452,25 +452,3 @@ st.pydeck_chart(
     use_container_width=True,
     height=720,
 )
-
-
-# ---------------------------------------------------------------------
-# Dataset notes
-# ---------------------------------------------------------------------
-
-with st.expander("Dataset notes"):
-    st.markdown(
-        f"""
-- GeoPackage layer: `{LAYER_NAME}`
-- CRS: `{grid_gdf.crs}`
-- Years: `{min(YEAR_COLUMNS)}–{max(YEAR_COLUMNS)}`
-- Displayed field: `{value_column}`
-- Grid cells: `{len(grid_gdf):,}`
-- Cached file: `{geopackage_path}`
-        """
-    )
-'''
-
-output_path = Path("/mnt/data/app_from_github_simplified.py")
-output_path.write_text(code, encoding="utf-8")
-print(output_path)
